@@ -1,0 +1,47 @@
+# Vib-Ribbon, European release (SCES-02873). Timings are in emulated video frames (50 per second).
+# The emulation is deterministic, so a script that works here keeps working.
+
+[disc]
+name = "Vib-Ribbon (Europe)"
+boot = ["SCES_028.73"]
+pal = true
+
+# Play with a song of your own: boot the game program directly (skips the loader and the title screen),
+# choose "Play with my own choice of CD" -> "Single track", swap the song in as the "music CD" and pick track 1.
+[macro.song]
+title = "Play with my song"
+needs_song = true
+boot_exe = "MAIN_G.EXE"
+steps = [
+    { fast_forward = true, turbo = true },
+    { wait_until = 220 },
+    { press = "down" },                                   # main menu: select "Play with my own choice of CD"
+    { wait_until = 280 },
+    { press = "cross" },
+    { wait_until = 400 },
+    { press = "cross" },                                  # "Single track"; the game now asks for a music CD
+    { wait_until = 500 },
+    { swap_song = true },
+    { wait_cd = "play", timeout = 3000 },                 # the game probes the new disc...
+    { wait = 120 },                                       # ...and then shows the track picker
+    { press = "cross", every = 40, until_cd = "mute", timeout = 3000 },   # track 1; Mute+Play = the song started
+    { fast_forward = false, turbo = false },
+]
+
+# The game's own tutorial: title screen -> HOW TO PLAY. Uses the normal boot (loader, title, language).
+[macro.how_to_play]
+title = "How to play (the game's tutorial)"
+needs_song = false
+steps = [
+    { fast_forward = true, turbo = true },
+    { wait_until = 900 },
+    { press = "start", hold = 2 },                                  # skip the intro animation
+    { wait_until = 2300 },
+    { press = "cross", hold = 2 },                                  # language: English (highlighted by default)
+    { wait_until = 2700 },
+    { press = "down", hold = 2 },                                   # GAME / HOW TO PLAY / LANGUAGE
+    { wait_until = 2800 },
+    { press = "cross", hold = 2 },
+    { wait_until = 3300 },
+    { fast_forward = false, turbo = false },
+]

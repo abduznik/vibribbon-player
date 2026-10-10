@@ -1,0 +1,37 @@
+[package]
+name = "vibribbon-player"
+description = "Play Vib-Ribbon with any song"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "vibribbon_player"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vibribbon-player"
+path = "src/main.rs"
+
+[dependencies]
+vibrt = { path = "../crates/vibrt" }
+media = { path = "../crates/media" }
+macros = { path = "../crates/macros" }
+audioout = { path = "../crates/audioout" }
+eframe = { version = "0.31", default-features = false, features = ["glow", "default_fonts", "x11", "wayland"] }
+gilrs = { version = "0.11", optional = true }
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "async-std"] }
+directories = "5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytemuck = "1"
+png = "0.17"
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[features]
+default = []
+# Gamepad support through gilrs; needs libudev headers on Linux (CI release builds enable it).
+gamepad = ["dep:gilrs"]

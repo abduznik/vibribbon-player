@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Vib-Ribbon Player
+Comment=Play Vib-Ribbon with any song
+Exec=vibribbon-player
+Icon=vibribbon-player
+Terminal=false
+Categories=Game;
+StartupWMClass=vibribbon-player

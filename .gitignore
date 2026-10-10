@@ -1,0 +1,29 @@
+# build output
+/target/
+/build/
+/gen/
+*.o
+
+# game data, songs and anything derived from them must never be committed
+/work/
+/Vib-Ribbon*
+/*.flac
+/*.mp3
+/*.m4a
+/*.ogg
+*.bin
+*.cue
+*.chd
+*.iso
+*.img
+*.zip
+*.ppm
+sdlaudio.raw
+
+# local toolchains and caches
+/third_party/sdl3-linux/
+/third_party/sdl3-build/
+/third_party/build-sdl3-linux/
+/third_party/SDL3*
+__pycache__/
+*.pyc

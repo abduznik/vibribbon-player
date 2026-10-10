@@ -1,0 +1,202 @@
+name: Release
+
+# Builds the player for Linux, Windows and macOS (Apple silicon and Intel) and publishes the archives:
+#   * pushing a tag such as v0.1.0 makes a regular GitHub release (the tag must match the version in Cargo.toml);
+#   * every push to main replaces the "nightly" pre-release with fresh builds.
+# The archives contain the program only: no game data of any kind.
+
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the result as the nightly pre-release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  meta:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.m.outputs.channel }}
+      tag: ${{ steps.m.outputs.tag }}
+      label: ${{ steps.m.outputs.label }}
+      version: ${{ steps.m.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: m
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match the version $version in Cargo.toml"
+              exit 1
+            fi
+            echo "channel=release" >> "$GITHUB_OUTPUT"
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "label=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=nightly" >> "$GITHUB_OUTPUT"
+            echo "tag=nightly" >> "$GITHUB_OUTPUT"
+            echo "label=nightly" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # Licence texts of the Rust dependencies. A failure here must not block a release.
+  licenses:
+    name: Third-party licences
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - run: cargo about generate --all-features about.hbs > THIRD_PARTY_LICENSES.html
+      - uses: actions/upload-artifact@v7
+        with:
+          name: licenses
+          path: THIRD_PARTY_LICENSES.html
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: [test, meta, licenses]
+    if: ${{ !cancelled() && needs.test.result == 'success' && needs.meta.result == 'success' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu, kind: linux }
+          - { name: windows-x86_64, os: windows-latest, target: x86_64-pc-windows-gnu, kind: windows }
+          - { name: macos-arm64, os: macos-latest, target: aarch64-apple-darwin, kind: macos }
+          - { name: macos-x86_64, os: macos-latest, target: x86_64-apple-darwin, kind: macos }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.name }}
+
+      - name: Linux packages
+        if: matrix.kind == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+
+      - name: Windows toolchain (MinGW-w64)
+        if: matrix.kind == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+          path-type: inherit
+
+      - name: Build
+        if: matrix.kind != 'windows'
+        run: cargo build --release -p vibribbon-player --features gamepad --target ${{ matrix.target }}
+
+      - name: Build (Windows)
+        if: matrix.kind == 'windows'
+        shell: msys2 {0}
+        run: cargo build --release -p vibribbon-player --features gamepad --target ${{ matrix.target }}
+
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: licenses
+
+      - name: Package
+        shell: bash
+        env:
+          LABEL: ${{ needs.meta.outputs.label }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          name="vibribbon-player-${LABEL}-${{ matrix.name }}"
+          bin="target/${{ matrix.target }}/release/vibribbon-player"
+          mkdir -p "$name"
+          cp README.md LICENSE-MIT LICENSE-APACHE "$name/"
+          cp THIRD_PARTY_LICENSES.html "$name/" 2>/dev/null || echo "no third-party licence file"
+          case "${{ matrix.kind }}" in
+            linux)
+              cp "$bin" "$name/"
+              cp packaging/linux/vibribbon-player.desktop "$name/"
+              cp player/assets/logo-512.png "$name/vibribbon-player.png"
+              tar czf "$name.tar.gz" "$name"
+              echo "ASSET=$name.tar.gz" >> "$GITHUB_ENV"
+              ;;
+            windows)
+              cp "$bin.exe" "$name/"
+              python -c "import shutil; shutil.make_archive('$name', 'zip', '.', '$name')"
+              echo "ASSET=$name.zip" >> "$GITHUB_ENV"
+              ;;
+            macos)
+              app="$name/Vib-Ribbon Player.app"
+              mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+              cp "$bin" "$app/Contents/MacOS/"
+              cp assets/AppIcon.icns "$app/Contents/Resources/"
+              sed "s/@VERSION@/$VERSION/g" packaging/macos/Info.plist.in > "$app/Contents/Info.plist"
+              codesign --force --deep --sign - "$app"      # ad-hoc signature: required to run on Apple silicon
+              ditto -c -k --keepParent "$name" "$name.zip"
+              echo "ASSET=$name.zip" >> "$GITHUB_ENV"
+              ;;
+          esac
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ env.ASSET }}
+
+  publish:
+    name: Publish
+    needs: [meta, build]
+    if: ${{ needs.build.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.publish) }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CHANNEL: ${{ needs.meta.outputs.channel }}
+      TAG: ${{ needs.meta.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: "{linux,windows,macos}-*"
+          merge-multiple: true
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Publish release
+        if: env.CHANNEL == 'release'
+        run: |
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Vib-Ribbon Player $TAG" --generate-notes
+
+      - name: Publish nightly
+        if: env.CHANNEL == 'nightly'
+        run: |
+          gh release delete nightly --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh release create nightly dist/* --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" \
+            --title "Nightly build" \
+            --notes "Automatic build of the latest commit on main ($GITHUB_SHA). Unfinished; use a numbered release for something stable."

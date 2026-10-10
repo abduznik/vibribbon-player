@@ -1,0 +1,10 @@
+[package]
+name = "audioout"
+description = "Audio output device (44.1 kHz stereo s16) through miniaudio, which loads the system audio libraries at run time"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[build-dependencies]
+cc = "1"

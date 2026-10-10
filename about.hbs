@@ -1,0 +1,18 @@
+<html>
+<head><meta charset="utf-8"><title>Third-party licences</title></head>
+<body>
+<h1>Third-party licences</h1>
+<p>Vib-Ribbon Player uses the following open source software. miniaudio (public domain / MIT-0) is bundled in
+<code>crates/audioout/c</code>.</p>
+<ul>
+{{#each overview}}<li><a href="#{{id}}">{{name}}</a> ({{count}})</li>{{/each}}
+</ul>
+{{#each licenses}}
+<hr>
+<h2 id="{{id}}">{{name}}</h2>
+<p>Used by:</p>
+<ul>{{#each used_by}}<li>{{crate.name}} {{crate.version}}</li>{{/each}}</ul>
+<pre>{{text}}</pre>
+{{/each}}
+</body>
+</html>

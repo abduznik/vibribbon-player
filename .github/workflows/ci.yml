@@ -1,0 +1,91 @@
+name: CI
+
+# Tests on Linux, macOS and Windows. Runs for pull requests and branch pushes, and is also called by the
+# release workflow before anything is built for release (pushes to main go through that workflow).
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Format
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  test:
+    name: Test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux, os: ubuntu-22.04, target: "" }
+          - { name: macOS (Apple silicon), os: macos-latest, target: "" }
+          - { name: Windows, os: windows-latest, target: x86_64-pc-windows-gnu }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+
+      - name: Linux packages (gamepad support needs the libudev headers)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+
+      # The C core is built with gcc/clang; on Windows that is MinGW-w64 together with the Rust GNU target.
+      - name: Windows toolchain (MinGW-w64)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+          path-type: inherit
+
+      - name: Build and test (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cargo build --workspace --features vibribbon-player/gamepad
+          cargo test --workspace --features vibribbon-player/gamepad
+
+      - name: Build and test (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cargo build --workspace --features vibribbon-player/gamepad --target ${{ matrix.target }}
+          cargo test --workspace --features vibribbon-player/gamepad --target ${{ matrix.target }}
+
+      # The C test harness used during development (no game needed to compile it)
+      - name: C test harness
+        if: runner.os == 'Linux'
+        run: make -j
+
+  # Intel Macs: cross-compiled on the Apple silicon runner (the binary is not run here)
+  macos-intel:
+    name: Build (macOS Intel)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-intel
+      - run: cargo build --release -p vibribbon-player --features gamepad --target x86_64-apple-darwin
