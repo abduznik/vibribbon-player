@@ -1,10 +1,11 @@
 [package]
 name = "vibribbon-player"
 description = "Play Vib-Ribbon with any song"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish.workspace = true
+version = "0.1.0"   # keep equal to the workspace version (the packaging tools do not follow inheritance)
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+authors = ["The Vib-Ribbon Player contributors"]
 
 [lib]
 name = "vibribbon_player"
@@ -38,6 +39,8 @@ gamepad = ["dep:gilrs"]
 
 [package.metadata.deb]
 name = "vibribbon-player"
+copyright = "2026 The Vib-Ribbon Player contributors"
+maintainer = "The Vib-Ribbon Player contributors <noreply@users.noreply.github.com>"
 section = "games"
 priority = "optional"
 depends = "$auto, libudev1"
