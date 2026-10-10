@@ -20,7 +20,8 @@ program.
 
 * *Windows:* if SmartScreen warns about an unknown publisher, choose "More info" > "Run anyway".
 * *macOS:* the app is not notarised. The first time, right-click `Vib-Ribbon Player.app` and choose "Open".
-* *Linux:* run `vibribbon-player`; the archive also holds a `.desktop` file and the icon if you want a menu entry.
+* *Linux:* pick what suits your distribution: an **AppImage** (any distribution: `chmod +x` it and run), a `.deb`
+  (Debian, Ubuntu, Mint), an `.rpm` (Fedora, openSUSE), or the plain `.tar.gz`.
 
 ## Using it
 

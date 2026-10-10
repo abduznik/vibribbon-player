@@ -168,6 +168,39 @@ jobs:
           name: ${{ matrix.name }}
           path: ${{ env.ASSET }}
 
+      # Linux: .deb (Debian, Ubuntu, Mint), .rpm (Fedora, openSUSE) and an AppImage (any distribution)
+      - name: Linux packages
+        if: matrix.kind == 'linux'
+        shell: bash
+        env:
+          LABEL: ${{ needs.meta.outputs.label }}
+        run: |
+          set -euo pipefail
+          T=${{ matrix.target }}
+          mkdir -p linux-pkgs
+          # the packaging tools expect the binary under target/release
+          mkdir -p target/release && cp "target/$T/release/vibribbon-player" target/release/
+          cargo install cargo-deb cargo-generate-rpm --locked
+          cargo deb -p vibribbon-player --no-build --no-strip -o "linux-pkgs/vibribbon-player-${LABEL}-linux-amd64.deb"
+          (cd player && cargo generate-rpm -p . -o "../linux-pkgs/vibribbon-player-${LABEL}-linux-x86_64.rpm")
+          # AppImage
+          AD=VibRibbonPlayer.AppDir
+          mkdir -p "$AD/usr/bin"
+          cp "target/$T/release/vibribbon-player" "$AD/usr/bin/"
+          cp packaging/linux/vibribbon-player.desktop "$AD/"
+          cp player/assets/logo-512.png "$AD/vibribbon-player.png"
+          printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/usr/bin/vibribbon-player" "$@"\n' > "$AD/AppRun"
+          chmod +x "$AD/AppRun"
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run "$AD" "linux-pkgs/vibribbon-player-${LABEL}-linux-x86_64.AppImage"
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.kind == 'linux'
+        with:
+          name: linux-packages
+          path: linux-pkgs/*
+
   publish:
     name: Publish
     needs: [meta, build]

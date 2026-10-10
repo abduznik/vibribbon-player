@@ -35,3 +35,31 @@ winresource = "0.1"
 default = []
 # Gamepad support through gilrs; needs libudev headers on Linux (CI release builds enable it).
 gamepad = ["dep:gilrs"]
+
+[package.metadata.deb]
+name = "vibribbon-player"
+section = "games"
+priority = "optional"
+depends = "$auto, libudev1"
+extended-description = "Play Vib-Ribbon with any song. Needs your own copy of the game."
+assets = [
+    ["target/release/vibribbon-player", "usr/bin/", "755"],
+    ["../packaging/linux/vibribbon-player.desktop", "usr/share/applications/", "644"],
+    ["assets/logo-512.png", "usr/share/icons/hicolor/512x512/apps/vibribbon-player.png", "644"],
+    ["../README.md", "usr/share/doc/vibribbon-player/", "644"],
+    ["../LICENSE-MIT", "usr/share/doc/vibribbon-player/", "644"],
+    ["../LICENSE-APACHE", "usr/share/doc/vibribbon-player/", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "vibribbon-player"
+assets = [
+    { source = "target/release/vibribbon-player", dest = "/usr/bin/vibribbon-player", mode = "755" },
+    { source = "../packaging/linux/vibribbon-player.desktop", dest = "/usr/share/applications/vibribbon-player.desktop", mode = "644" },
+    { source = "assets/logo-512.png", dest = "/usr/share/icons/hicolor/512x512/apps/vibribbon-player.png", mode = "644" },
+    { source = "../LICENSE-MIT", dest = "/usr/share/doc/vibribbon-player/LICENSE-MIT", mode = "644", doc = true },
+    { source = "../LICENSE-APACHE", dest = "/usr/share/doc/vibribbon-player/LICENSE-APACHE", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+systemd-libs = "*"
