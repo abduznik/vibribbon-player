@@ -182,6 +182,7 @@ jobs:
           mkdir -p target/release && cp "target/$T/release/vibribbon-player" target/release/
           cargo install cargo-deb cargo-generate-rpm --locked
           cargo deb -p vibribbon-player --no-build --no-strip -o "linux-pkgs/vibribbon-player-${LABEL}-linux-amd64.deb"
+          mkdir -p player/target/release && cp target/release/vibribbon-player player/target/release/   # rpm asset paths are relative to the package
           (cd player && cargo generate-rpm -p . -o "../linux-pkgs/vibribbon-player-${LABEL}-linux-x86_64.rpm")
           # AppImage
           AD=VibRibbonPlayer.AppDir
